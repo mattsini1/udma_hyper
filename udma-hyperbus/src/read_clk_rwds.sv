@@ -46,6 +46,7 @@ module read_clk_rwds #(
 
     logic cdc_input_fifo_ready;
     logic read_in_valid;
+    logic clk_rwds_inverter;
 
 
     //Delay of rwds for center aligned read
@@ -58,16 +59,25 @@ module read_clk_rwds #(
     );
 
     // Clock gate
-    assign clk_rwds_orig = hyper_rwds_i_d && read_clk_en_i;
+    //assign clk_rwds_orig = hyper_rwds_i_d && read_clk_en_i;
 
-   `ifdef PULP_FPGA_EMUL
+
+    pulp_clock_gating clk_rwds_origin_clk_gate (
+           .clk_i     ( hyper_rwds_i_d  ),
+           .en_i      ( read_clk_en_i  ),
+           .test_en_i ( 1'b0  ),
+           .clk_o     ( clk_rwds_orig )
+       );
+
+
+   //`ifdef ( PULP_FPGA_EMUL | SYNTHESIS )
     pulp_clock_mux2 ddrmux (
         .clk_o     ( clk_rwds      ),
         .clk0_i    ( clk_rwds_orig ),
         .clk1_i    ( clk_test      ),
         .clk_sel_i ( test_en_ti    )
     );
-   `else
+   /*`else
     always_comb
       begin
         if (test_en_ti == 1'b0)
@@ -76,7 +86,7 @@ module read_clk_rwds #(
           clk_rwds = clk_test;
       end
 
-   `endif
+   `endif*/
 
     assign resetReadModule = ~rst_ni || (~read_clk_en_i && ~test_en_ti);
 
@@ -106,9 +116,16 @@ module read_clk_rwds #(
     end
     `endif
 
+    pulp_clock_inverter clk_inv_i2s_tx_dsp
+    (
+      .clk_i(clk_rwds),
+      .clk_o(clk_rwds_inverter)
+    );
+
+
     cdc_fifo_gray_hyper  #(.T(logic[31:0]), .LOG_DEPTH(4)) i_cdc_fifo_hyper ( 
       .src_rst_ni  ( rst_ni               ), 
-      .src_clk_i   ( !clk_rwds             ), 
+      .src_clk_i   ( clk_rwds_inverter    ), 
       .src_data_i  ( data_fifoin           ), 
       .src_valid_i ( read_in_valid        ), 
       .src_ready_o ( cdc_input_fifo_ready ), 
