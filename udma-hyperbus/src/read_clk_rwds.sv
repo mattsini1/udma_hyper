@@ -116,7 +116,7 @@ module read_clk_rwds #(
     end
     `endif
 
-    pulp_clock_inverter clk_inv_i2s_tx_dsp
+    pulp_clock_inverter clk_inv_rwds
     (
       .clk_i(clk_rwds),
       .clk_o(clk_rwds_inverter)
