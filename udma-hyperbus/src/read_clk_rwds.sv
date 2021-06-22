@@ -48,7 +48,9 @@ module read_clk_rwds #(
     logic read_in_valid;
     logic clk_rwds_inverter;
 
-
+   logic  clk0_gated;
+   
+   
     //Delay of rwds for center aligned read
     hyperbus_delay_line #(
         .BIT_WIDTH     ( DELAY_BIT_WIDTH          )
@@ -58,10 +60,6 @@ module read_clk_rwds #(
         .delay         ( config_t_rwds_delay_line )
     );
 
-    // Clock gate
-    //assign clk_rwds_orig = hyper_rwds_i_d && read_clk_en_i;
-
-
     pulp_clock_gating clk_rwds_origin_clk_gate (
            .clk_i     ( hyper_rwds_i_d  ),
            .en_i      ( read_clk_en_i  ),
@@ -69,24 +67,20 @@ module read_clk_rwds #(
            .clk_o     ( clk_rwds_orig )
        );
 
-
-   //`ifdef ( PULP_FPGA_EMUL | SYNTHESIS )
+    pulp_clock_gating clk_0_gate (
+           .clk_i     ( clk0           ),
+           .en_i      ( read_clk_en_i  ),
+           .test_en_i ( 1'b0           ),
+           .clk_o     ( clk0_gated     )
+       );
+   
     pulp_clock_mux2 ddrmux (
         .clk_o     ( clk_rwds      ),
-        .clk0_i    ( clk_rwds_orig ),
-        .clk1_i    ( clk_test      ),
-        .clk_sel_i ( test_en_ti    )
+        .clk0_i    ( 1'b0          ),
+        .clk1_i    ( clk_rwds_orig ),
+        .clk_sel_i ( read_clk_en_i )
     );
-   /*`else
-    always_comb
-      begin
-        if (test_en_ti == 1'b0)
-          clk_rwds = clk_rwds_orig;
-        else
-          clk_rwds = clk_test;
-      end
 
-   `endif*/
 
     assign resetReadModule = ~rst_ni || (~read_clk_en_i && ~test_en_ti);
 
@@ -106,7 +100,7 @@ module read_clk_rwds #(
           data_pedge <= hyper_dq_i;
       end
 
-    assign data_fifoin = (mem_sel_i==2'b11) ? {data_pedge, hyper_dq_i} : {16'b0, data_pedge[7:0], hyper_dq_i[7:0]};
+    assign data_fifoin = read_in_valid ? ( (mem_sel_i==2'b11) ? {data_pedge, hyper_dq_i} : {16'b0, data_pedge[7:0], hyper_dq_i[7:0]} ) : 32'b0;
 
 
 
@@ -123,18 +117,19 @@ module read_clk_rwds #(
     );
 
 
-    cdc_fifo_gray_hyper  #(.T(logic[31:0]), .LOG_DEPTH(4)) i_cdc_fifo_hyper ( 
-      .src_rst_ni  ( rst_ni               ), 
+    udma_dc_fifo_hyper  #(.DATA_WIDTH(32), .BUFFER_DEPTH(16)) 
+    i_cdc_fifo_hyper ( 
+      .src_rstn_i  ( rst_ni               ), 
       .src_clk_i   ( clk_rwds_inverter    ), 
-      .src_data_i  ( data_fifoin           ), 
+      .src_data_i  ( data_fifoin          ), 
       .src_valid_i ( read_in_valid        ), 
       .src_ready_o ( cdc_input_fifo_ready ), 
  
-      .dst_rst_ni  ( rst_ni  ), 
-      .dst_clk_i   ( clk0    ), 
-      .dst_data_o  ( data_o  ), 
-      .dst_valid_o ( valid_o ), 
-      .dst_ready_i ( ready_i ) 
+      .dst_rstn_i  ( rst_ni               ), 
+      .dst_clk_i   ( clk0_gated           ), 
+      .dst_data_o  ( data_o               ), 
+      .dst_valid_o ( valid_o              ), 
+      .dst_ready_i ( ready_i              ) 
     ); 
     
 
