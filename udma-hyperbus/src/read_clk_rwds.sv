@@ -76,7 +76,7 @@ module read_clk_rwds #(
    
     pulp_clock_mux2 ddrmux (
         .clk_o     ( clk_rwds      ),
-        .clk0_i    ( 1'b0          ),
+        .clk0_i    ( 1'b1          ),
         .clk1_i    ( clk_rwds_orig ),
         .clk_sel_i ( read_clk_en_i )
     );
